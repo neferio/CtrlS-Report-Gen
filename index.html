@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CtrlS Vendor Report Generator · Venwiz</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<style>
+:root{--bg:#EEF1F5;--surface:#fff;--ink:#14181F;--muted:#5B6470;--line:#E3E6EB;--navy:#1F3864;--blue:#2E5496;--accent:#0B9499;--accent-soft:#E4F2F2;--cream:#FFF7DF;--radius:14px}
+*{box-sizing:border-box}html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:'Inter',system-ui,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased;padding:36px 20px 80px}
+.wrap{max-width:720px;margin:0 auto}
+.eyebrow{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);font-weight:600;margin:0 0 8px}
+h1{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:28px;letter-spacing:-.02em;margin:0;color:var(--navy)}
+.sub{color:var(--muted);font-size:14px;margin:8px 0 0}
+.pipe{display:flex;gap:8px;margin:26px 0 20px}
+.pstep{flex:1;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--surface);border:1px solid var(--line);border-radius:10px;font-size:13px;color:var(--muted);transition:.15s}
+.pstep .n{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--line);color:var(--muted);font-weight:600;font-size:12px;flex:none}
+.pstep.active{border-color:var(--navy);color:var(--navy);box-shadow:0 1px 0 var(--navy)}
+.pstep.active .n{background:var(--navy);color:#fff}
+.pstep.done .n{background:var(--accent);color:#fff}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:26px}
+.panel{display:none}.panel.show{display:block}
+.drop{border:2px dashed var(--line);border-radius:12px;padding:48px 24px;text-align:center;cursor:pointer;transition:.15s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .ic{font-size:34px}.drop h3{margin:14px 0 4px;font-family:'Space Grotesk',sans-serif;color:var(--navy)}
+.drop p{margin:0;color:var(--muted);font-size:13px}
+label.fld{display:block;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px}
+select{width:100%;padding:13px 14px;font-size:15px;font-family:inherit;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--ink)}
+.summary{margin-top:18px;display:none}
+.summary.show{display:block}
+.chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.chip{font-size:12px;padding:5px 10px;border-radius:20px;background:var(--accent-soft);color:#08585c;font-weight:600}
+.po-list{margin-top:14px;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.po-row{display:flex;justify-content:space-between;padding:10px 14px;font-size:13px;border-bottom:1px solid var(--line)}
+.po-row:last-child{border-bottom:none}.po-row b{color:var(--navy)}
+.po-row .st{font-size:12px;color:var(--muted)}
+.btns{display:flex;gap:10px;margin-top:22px}
+button{font-family:inherit;font-size:14px;font-weight:600;border-radius:10px;padding:13px 22px;border:1px solid transparent;cursor:pointer;transition:.15s}
+.primary{background:var(--navy);color:#fff}.primary:hover{background:#16294a}.primary:disabled{opacity:.45;cursor:not-allowed}
+.ghost{background:#fff;color:var(--muted);border-color:var(--line)}.ghost:hover{border-color:var(--muted);color:var(--ink)}
+.err{display:none;margin-top:14px;padding:12px 14px;background:#FDECEA;border:1px solid #F5C6C0;color:#A23A2E;border-radius:10px;font-size:13px}
+.err.show{display:block}
+.done-ic{font-size:46px;text-align:center}
+.done-t{text-align:center;font-family:'Space Grotesk',sans-serif;font-size:22px;color:var(--navy);margin:10px 0 4px}
+.done-s{text-align:center;color:var(--muted);font-size:14px;margin:0 0 6px}
+.foot{margin-top:22px;font-size:12px;color:var(--muted);text-align:center}
+.foot b{color:var(--ink)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<p class="eyebrow">Venwiz Expediting</p>
+<h1>CtrlS Vendor Report Generator</h1>
+<p class="sub">Upload the MMT data dump, pick a vendor, and download its visit report — all POs for that vendor, in the standard format. Runs entirely in your browser; the dump never leaves your machine.</p>
+</header>
+<div class="pipe">
+<div class="pstep active" id="ps1"><span class="n">1</span> Upload dump</div>
+<div class="pstep" id="ps2"><span class="n">2</span> Select vendor</div>
+<div class="pstep" id="ps3"><span class="n">3</span> Download</div>
+</div>
+
+<div class="card">
+<!-- STEP 1 -->
+<div class="panel show" id="p1">
+<div class="drop" id="drop">
+<div class="ic">📄</div>
+<h3>Drop the data dump here</h3>
+<p>or click to browse · .xlsx or .csv</p>
+</div>
+<input type="file" id="file" accept=".xlsx,.xls,.csv" style="display:none"/>
+<div class="err" id="err1"></div>
+</div>
+
+<!-- STEP 2 -->
+<div class="panel" id="p2">
+<label class="fld" for="vendor">Vendor</label>
+<select id="vendor"></select>
+<div class="summary" id="summary"></div>
+<div class="btns">
+<button class="ghost" id="back2">← Back</button>
+<button class="primary" id="gen" disabled>Generate &amp; download</button>
+</div>
+</div>
+
+<!-- STEP 3 -->
+<div class="panel" id="p3">
+<div class="done-ic">✅</div>
+<div class="done-t" id="doneName">Report downloaded</div>
+<p class="done-s">Saved to your downloads. Open it, fill in Visit Details, and circulate.</p>
+<div class="btns" style="justify-content:center">
+<button class="ghost" id="another">← Pick another vendor</button>
+<button class="primary" id="reset">Start over (new dump)</button>
+</div>
+</div>
+</div>
+
+<p class="foot">Five fields are split on <b>&lt;break&gt;</b> (Comments, Issues, Progress, Vendor &amp; Client actionables). Completed floors collapse to a single line; Visit Details and actionable comments are left blank for the expediter to fill.</p>
+</div>
+
+<script>
+/* Shared report-generation core. Works in Node (require) and browser (globals XLSX, ExcelJS). */
+(function(root){
+const NAVY="FF1F3864",PKG="FF2E5496",ROLL="FFEAF0FA",DONE="FFC6EFCE",DONETX="FF375623",
+      CREAM="FFFFF2CC",LAV="FFD9E1F2",LABEL="FFFFFFFF",LINE="FFDCDCDC",
+      RED="FFC00000",GRN="FF548235",MUT="FF808080",WHITE="FFFFFFFF",BLACK="FF000000";
+const ST={"Completed":"FF375623","On Track":"FF548235","Low Risk":"FF70AD47","Medium Risk":"FFBF8F00",
+          "High Risk":"FFE26B0A","Delayed":"FFC00000","Not Started":"FF808080","At Risk":"FFBF8F00"};
+const stcol=s=>ST[String(s||"").trim()]||"FF808080";
+const FN="Arial";
+const thin={style:"thin",color:{argb:LINE}};
+const BORD={top:thin,left:thin,right:thin,bottom:thin};
+const MON=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function clean(v){const s=(v===null||v===undefined)?"":String(v).trim();return (s===""||s==="-")?"":s;}
+function splitBreak(v){const s=clean(v);if(!s)return [];return s.split("<break>").map(x=>x.trim()).filter(x=>x&&x!=="-");}
+function fmtDate(v){
+  if(v===null||v===undefined||v==="")return "";
+  if(v instanceof Date){const d=v;return `${String(d.getDate()).padStart(2,"0")}-${MON[d.getMonth()]}-${String(d.getFullYear()).slice(2)}`;}
+  const s=String(v).trim(); const m=s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if(m){return `${m[1].padStart(2,"0")}-${MON[parseInt(m[2],10)-1]}-${m[3].slice(2)}`;}
+  return s;
+}
+function pct(v){const n=Number(v);return isFinite(n)?`${Math.round(n)}%`:"";}
+function uint(v){const n=Number(v);return isFinite(n)?Math.round(n):0;}
+function titleCase(s){return String(s||"").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()).replace(/\s+/g," ").trim();}
+
+/* ---------- parse dump (array-of-arrays to survive duplicate headers) ---------- */
+function parseDump(aoa){
+  const H=aoa[0].map(x=>String(x==null?"":x).trim());
+  const all=i=>H.map((h,k)=>h===i?k:-1).filter(k=>k>=0);
+  const ci=n=>all(n)[0], ciL=n=>{const a=all(n);return a[a.length-1];};
+  const C={vendor:ci("Vendor"),project:ci("Project"),po:ci("PO"),poDesc:ci("PO Description"),pkg:ci("Package"),
+    cliAct:ci("Client Level Actionable Issues"),venAct:ci("Vendor Level Actionable Issues"),
+    poExp:ci("PO Expected %"),poAct:ci("PO Actual %"),poPend:ci("PO Plan End Date"),poFend:ci("PO Forecasted End Date"),
+    poStatus:ci("PO Status"),poTot:ci("Total Units"),poUexp:ci("Unit Expected Till Date"),poUdel:ci("Unit Delivered Till Date"),
+    flName:ci("Floor Name"),flDesc:ci("Floor Description"),flExp:ci("Floor Expected %"),flAct:ci("Floor Actual %"),
+    flPend:ci("Floor Plan End Date"),flFend:ci("Floor Forecasted End Date"),flStatus:ci("Floor Status"),
+    flTot:ci("Total Units in Floor"),flUexp:ciL("Unit Expected Till Date"),flUdel:ciL("Unit Delivered Till Date"),
+    cmt:ci("Comments"),iss:ci("Raised Issues"),md:ci("Most Delayed Milestone"),prog:ci("Milestone with Progress (Last 24 Hours)")};
+  const rows=aoa.slice(1).filter(r=>r&&clean(r[C.vendor]));
+  // group by normalized vendor
+  const vmap=new Map();
+  for(const r of rows){
+    const key=clean(r[C.vendor]).toLowerCase();
+    if(!vmap.has(key)) vmap.set(key,{display:titleCase(r[C.vendor]),project:clean(r[C.project]),rows:[]});
+    vmap.get(key).rows.push(r);
+  }
+  // build structured vendors
+  const vendors=[];
+  for(const v of vmap.values()){
+    const poMap=new Map();
+    const venActSet=[],cliActSet=[],seenV=new Set(),seenC=new Set();
+    for(const r of v.rows){
+      splitBreak(r[C.venAct]).forEach(a=>{if(!seenV.has(a)){seenV.add(a);venActSet.push(a);}});
+      splitBreak(r[C.cliAct]).forEach(a=>{if(!seenC.has(a)){seenC.add(a);cliActSet.push(a);}});
+      const pk=`${clean(r[C.pkg])}|${clean(r[C.po])}`;
+      if(!poMap.has(pk)) poMap.set(pk,{
+        pkg:clean(r[C.pkg]),po:clean(r[C.po]),desc:clean(r[C.poDesc]),status:clean(r[C.poStatus]),
+        exp:r[C.poExp],act:r[C.poAct],pend:fmtDate(r[C.poPend]),fend:fmtDate(r[C.poFend]),
+        tot:uint(r[C.poTot]),uexp:uint(r[C.poUexp]),udel:uint(r[C.poUdel]),floors:[]});
+      poMap.get(pk).floors.push({
+        label:clean(r[C.flDesc])||clean(r[C.flName]),
+        exp:r[C.flExp],act:r[C.flAct],status:clean(r[C.flStatus]),
+        pend:fmtDate(r[C.flPend]),fend:fmtDate(r[C.flFend]),
+        tot:uint(r[C.flTot]),uexp:uint(r[C.flUexp]),udel:uint(r[C.flUdel]),
+        md:clean(r[C.md]),prog:splitBreak(r[C.prog]),cmt:splitBreak(r[C.cmt]),iss:splitBreak(r[C.iss])});
+    }
+    vendors.push({display:v.display,project:v.project,pos:[...poMap.values()],venAct:venActSet,cliAct:cliActSet});
+  }
+  vendors.sort((a,b)=>a.display.localeCompare(b.display));
+  return vendors;
+}
+
+/* ---------- build workbook for one vendor ---------- */
+async function buildWorkbook(EX,vendor){
+  const wb=new EX.Workbook();
+  const ws=wb.addWorksheet("Vendor Report",{
+    views:[{showGridLines:false}],
+    pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,
+               margins:{left:0.25,right:0.25,top:0.4,bottom:0.4,header:0.2,footer:0.2}}});
+  const W=[13,15,9,9,15,13,13,33,52]; ws.columns=W.map(w=>({width:w}));
+  const NC=9; let r=1;
+  const C=(rr,cc)=>ws.getCell(rr,cc);
+  function sty(cell,o){o=o||{};
+    cell.font={name:FN,bold:!!o.b,color:{argb:o.col||BLACK},size:o.sz||10};
+    if(o.bg)cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:o.bg}};
+    cell.alignment={horizontal:o.al||"left",vertical:o.va||"middle",wrapText:!!o.wrap};
+    if(o.bd!==false)cell.border=BORD;}
+  function put(rr,cc,val,o){const cell=C(rr,cc);cell.value=val;sty(cell,o);return cell;}
+  function mrg(rr,c1,c2){ws.mergeCells(rr,c1,rr,c2);}
+  function rowBord(rr){for(let c=1;c<=NC;c++)C(rr,c).border=BORD;}
+  function setH(rr,h){ws.getRow(rr).height=h;}
+
+  // ---- vendor header ----
+  mrg(r,1,NC);put(r,1,"VENWIZ EXPEDITING    ·    VENDOR VISIT REPORT",{b:true,col:WHITE,sz:15,bg:NAVY,bd:false});setH(r,30);r++;
+  const tunits=vendor.pos.reduce((s,p)=>s+p.tot,0);
+  const today=new Date(),asof=`${String(today.getDate()).padStart(2,"0")}-${MON[today.getMonth()]}-${String(today.getFullYear()).slice(2)}`;
+  mrg(r,1,NC);put(r,1,`${vendor.display}        ·        ${vendor.project}        ·        ${vendor.pos.length} POs · ${tunits} units        ·        as of ${asof}`,{b:true,col:WHITE,sz:11,bg:NAVY,bd:false});setH(r,22);r+=2;
+
+  // ---- VISIT DETAILS (fill at arrival) ----
+  mrg(r,1,NC);put(r,1,"   VISIT DETAILS   (fill at arrival)",{b:true,col:WHITE,sz:11,bg:PKG});setH(r,22);r++;
+  const VD=[["Visit date","Visit owner / expediter name"],["Vendor SPOC met (name, designation)","Plant address visited"],
+            ["Visit start time","Visit end time"],["Sub-vendors / OEM reps present","Photos taken (yes/no, count)"]];
+  for(const [l1,l2] of VD){
+    mrg(r,1,2);put(r,1,l1,{b:true,sz:9,bg:LABEL,wrap:true});
+    mrg(r,3,5);put(r,3,"",{bg:CREAM});
+    mrg(r,6,7);put(r,6,l2,{b:true,sz:9,bg:LABEL,wrap:true});
+    mrg(r,8,9);put(r,8,"",{bg:CREAM});
+    rowBord(r);setH(r,28);r++;
+  }
+  r++;
+
+  // ---- OPEN ACTIONABLES ----
+  mrg(r,1,NC);put(r,1,"   OPEN ACTIONABLES",{b:true,col:WHITE,sz:11,bg:PKG});setH(r,22);r++;
+  function actionableTable(title,items){
+    mrg(r,1,6);put(r,1,"   "+title,{b:true,sz:10,bg:LAV});
+    mrg(r,7,9);put(r,7,"Comments (if any)",{b:true,sz:10,bg:LAV});
+    rowBord(r);setH(r,20);r++;
+    if(!items.length){
+      mrg(r,1,6);put(r,1,"   No open actionables",{sz:9,col:MUT});
+      mrg(r,7,9);put(r,7,"",{bg:CREAM});
+      rowBord(r);setH(r,20);r++;return;
+    }
+    for(const x of items){
+      mrg(r,1,6);put(r,1,"   "+x,{sz:9,wrap:true});
+      mrg(r,7,9);put(r,7,"",{bg:CREAM});
+      rowBord(r);setH(r,Math.max(20,(Math.floor(x.length/75)+1)*16+4));r++;
+    }
+  }
+  actionableTable("Vendor — Open Actionables",vendor.venAct);r++;
+  actionableTable("Client (CtrlS) — Open Actionables",vendor.cliAct);r+=3;
+
+  // ---- PO sections ----
+  const HEAD=["Floor","Units\nDelivered / Total","Exp %","Act %","Status","Planned\nEnd","Forecast\nEnd","Most-Delayed Milestone","Last 24 hrs"];
+  for(const po of vendor.pos){
+    mrg(r,1,7);put(r,1,`   ${po.pkg}      ·      PO ${po.po}      ·      ${po.desc}`,{b:true,col:WHITE,sz:12,bg:PKG});
+    mrg(r,8,9);put(r,8,`Status: ${po.status}   `,{col:WHITE,sz:11,al:"right",bg:PKG});
+    setH(r,26);r++;
+    mrg(r,1,NC);
+    put(r,1,`   Expected ${pct(po.exp)}      ·      Actual ${pct(po.act)}            Planned End ${po.pend}      ·      Forecast End ${po.fend}            Units delivered ${po.udel} of ${po.tot}  ·  expected ${po.uexp} by now`,{sz:10,bg:ROLL});
+    setH(r,24);r++;
+    HEAD.forEach((h,i)=>put(r,i+1,h,{b:true,sz:9,bg:PKG,col:WHITE,al:(i===7||i===8)?"left":"center",wrap:true}));
+    setH(r,32);r++;
+    for(const fl of po.floors){
+      if(fl.status==="Completed"){
+        put(r,1,fl.label,{b:true,sz:10,bg:DONE,al:"center"});
+        unitsCell(r,2,fl.udel,fl.uexp,fl.tot,true);
+        mrg(r,3,9);put(r,3,{richText:[{font:{name:FN,size:10,bold:true,color:{argb:DONETX}},text:"✓  Completed"}]},{bg:DONE,al:"left"});
+        rowBord(r);setH(r,30);r++;continue;
+      }
+      put(r,1,fl.label,{b:true,sz:10,al:"center",wrap:true});
+      unitsCell(r,2,fl.udel,fl.uexp,fl.tot,false);
+      put(r,3,pct(fl.exp),{sz:10,al:"center"});
+      put(r,4,pct(fl.act),{sz:10,al:"center"});
+      put(r,5,{richText:[{font:{name:FN,size:10,bold:true,color:{argb:stcol(fl.status)}},text:"● "},
+                         {font:{name:FN,size:10,color:{argb:BLACK}},text:fl.status}]},{al:"center"});
+      put(r,6,fl.pend,{sz:10,al:"center"});
+      const slip=fl.fend&&fl.pend&&fl.fend!==fl.pend;
+      put(r,7,fl.fend,{sz:10,al:"center",col:slip?RED:BLACK,b:!!slip});
+      put(r,8,fl.md||"",{sz:9,wrap:true,al:"left"});
+      const lines=activityCell(r,9,fl.prog,fl.cmt,fl.iss);
+      const mdl=(fl.md&&fl.md.length>32)?2:1;
+      rowBord(r);setH(r,Math.max(34,Math.max(lines,mdl,2)*15));r++;
+    }
+    r+=3;
+  }
+
+  function unitsCell(rr,cc,d,e,t,done){
+    const cell=C(rr,cc);
+    cell.value={richText:[{font:{name:FN,size:11,bold:true,color:{argb:done?DONETX:BLACK}},text:`${d} / ${t}`},
+                          {font:{name:FN,size:8,color:{argb:MUT}},text:`\nExp. Till Date: ${e}`}]};
+    cell.alignment={horizontal:"center",vertical:"middle",wrapText:true};
+    if(done)cell.fill={type:"pattern",pattern:"solid",fgColor:{argb:DONE}};
+    cell.border=BORD;
+  }
+  function activityCell(rr,cc,prog,cmt,iss){
+    const runs=[];let lines=0;
+    const head=(t,col)=>runs.push({font:{name:FN,size:9,bold:true,color:{argb:col}},text:t+"\n"});
+    const bul=(t,col)=>runs.push({font:{name:FN,size:9,color:{argb:col||BLACK}},text:"   •  "+t+"\n"});
+    if(iss.length){head("Issues",RED);iss.forEach(x=>{bul(x,RED);lines++;});lines++;}
+    if(prog.length){head("Progress (24h)",GRN);prog.slice(0,6).forEach(x=>{bul(x);lines++;});if(prog.length>6){bul(`+${prog.length-6} more`,MUT);lines++;}lines++;}
+    if(cmt.length){head("Comments",MUT);cmt.forEach(x=>{bul(x);lines++;});lines++;}
+    const cell=C(rr,cc);
+    if(runs.length){cell.value={richText:runs};cell.alignment={horizontal:"left",vertical:"middle",wrapText:true};}
+    cell.border=BORD;return lines;
+  }
+
+  return wb;
+}
+
+const api={parseDump,buildWorkbook};
+if(typeof module!=="undefined"&&module.exports)module.exports=api; else root.ReportCore=api;
+})(typeof self!=="undefined"?self:this);
+</script>
+<script>
+const $=id=>document.getElementById(id);
+let VENDORS=[],sel=-1;
+function setStep(s){
+  [1,2,3].forEach(i=>{$('p'+i).classList.toggle('show',i===s);
+    const ps=$('ps'+i);ps.classList.toggle('active',i===s);ps.classList.toggle('done',i<s);});
+}
+function showErr(m){const e=$('err1');e.textContent=m;e.classList.add('show');}
+function clrErr(){$('err1').classList.remove('show');}
+
+// ---- upload ----
+const drop=$('drop'),file=$('file');
+drop.onclick=()=>file.click();
+['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop',e=>{if(e.dataTransfer.files[0])readFile(e.dataTransfer.files[0]);});
+file.onchange=e=>{if(e.target.files[0])readFile(e.target.files[0]);};
+
+function readFile(f){
+  clrErr();
+  const fr=new FileReader();
+  fr.onload=ev=>{
+    try{
+      const data=new Uint8Array(ev.target.result);
+      const wb=XLSX.read(data,{type:'array',cellDates:true});
+      const aoa=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,raw:true,defval:''});
+      VENDORS=ReportCore.parseDump(aoa);
+      if(!VENDORS.length){showErr('No vendors found. Check that this is the MMT vendor dump (needs a "Vendor" column).');return;}
+      buildSelect();setStep(2);
+    }catch(ex){showErr('Could not read file: '+ex.message);}
+  };
+  fr.readAsArrayBuffer(f);
+}
+
+function buildSelect(){
+  const s=$('vendor');
+  s.innerHTML='<option value="" disabled selected>— choose a vendor —</option>'+
+    VENDORS.map((v,i)=>`<option value="${i}">${v.display}</option>`).join('');
+  s.onchange=()=>{sel=+s.value;renderSummary();$('gen').disabled=false;};
+  $('summary').classList.remove('show');$('gen').disabled=true;sel=-1;
+}
+function renderSummary(){
+  const v=VENDORS[sel];if(!v)return;
+  const floors=v.pos.reduce((a,p)=>a+p.floors.length,0);
+  const units=v.pos.reduce((a,p)=>a+p.tot,0);
+  const sum=$('summary');
+  sum.innerHTML=
+    `<div class="chips"><span class="chip">${v.pos.length} PO${v.pos.length>1?'s':''}</span>`+
+    `<span class="chip">${floors} floors</span><span class="chip">${units} units</span></div>`+
+    `<div class="po-list">`+v.pos.map(p=>
+      `<div class="po-row"><span><b>${p.pkg}</b> · PO ${p.po}</span><span class="st">${p.status} · Exp ${Math.round(p.exp)}% / Act ${Math.round(p.act)}%</span></div>`).join('')+
+    `</div>`;
+  sum.classList.add('show');
+}
+
+// ---- generate ----
+$('gen').onclick=async()=>{
+  const v=VENDORS[sel];if(!v)return;
+  const btn=$('gen');btn.disabled=true;btn.textContent='Generating…';
+  try{
+    const wb=await ReportCore.buildWorkbook(window.ExcelJS,v);
+    const buf=await wb.xlsx.writeBuffer();
+    const blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='Visit_Report_'+v.display.replace(/[^A-Za-z0-9]+/g,'_')+'.xlsx';
+    document.body.appendChild(a);a.click();a.remove();
+    $('doneName').textContent=v.display+' — report downloaded';
+    setStep(3);
+  }catch(ex){alert('Generation failed: '+ex.message);}
+  btn.disabled=false;btn.textContent='Generate & download';
+};
+
+$('back2').onclick=()=>setStep(1);
+$('another').onclick=()=>setStep(2);
+$('reset').onclick=()=>{VENDORS=[];file.value='';setStep(1);};
+</script>
+</body>
+</html>
