@@ -242,8 +242,8 @@ async function buildWorkbook(EX,vendor){
       const cur=Number(p.cur),last=Number(p.last);
       if(!(isFinite(last)&&isFinite(cur)&&Math.abs(cur-last)>0.05))continue;
       if(lines>0)runs.push({font:{name:FN,size:6},text:"\n\n"});
-      runs.push({font:{name:FN,size:9,color:{argb:BLACK}},text:`•   ${p.name}   —   ${Math.round(cur)}%`});
-      runs.push({font:{name:FN,size:9,bold:true,color:{argb:GRN}},text:`      ↑ from ${Math.round(last)}%`});
+      runs.push({font:{name:FN,size:9,color:{argb:BLACK}},text:`•   ${p.name}   —   `});
+      runs.push({font:{name:FN,size:9,bold:true,color:{argb:GRN}},text:`Moved from ${Math.round(last)}% to ${Math.round(cur)}%`});
       lines++;
     }
     const c=Cl(rr,cc);
