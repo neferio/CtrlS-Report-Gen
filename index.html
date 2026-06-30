@@ -143,19 +143,17 @@ function parseDump(aoa){
   const vendors=[];
   for(const g of vmap.values()){
     let disp=""; for(const n of Object.keys(g.names)) if(n.length>disp.length)disp=n; disp=titleCase(disp);
-    const poMap=new Map(), actByProject={}, projects=[];
+    const poMap=new Map(), projects=[];
     for(const r of g.rows){
       const proj=clean(r[C.project])||"\u2014";
       if(!projects.includes(proj))projects.push(proj);
-      if(!actByProject[proj])actByProject[proj]={ven:[],cli:[],_v:new Set(),_c:new Set()};
-      const ap=actByProject[proj];
-      splitBreak(r[C.venAct]).forEach(a=>{if(!ap._v.has(a)){ap._v.add(a);ap.ven.push(a);}});
-      splitBreak(r[C.cliAct]).forEach(a=>{if(!ap._c.has(a)){ap._c.add(a);ap.cli.push(a);}});
       const pk=`${proj}|${clean(r[C.pkg])}|${clean(r[C.po])}`;
       if(!poMap.has(pk))poMap.set(pk,{project:proj,pkg:clean(r[C.pkg]),po:clean(r[C.po]),desc:clean(r[C.poDesc]),status:clean(r[C.poStatus]),
         exp:r[C.poExp],act:r[C.poAct],pend:fmtDate(r[C.poPend]),fend:fmtDate(r[C.poFend]),
-        tot:uint(r[C.poTot]),uexp:uint(r[C.poUexp]),udel:uint(r[C.poUdel]),floorMap:new Map()});
+        tot:uint(r[C.poTot]),uexp:uint(r[C.poUexp]),udel:uint(r[C.poUdel]),floorMap:new Map(),venAct:[],cliAct:[],_va:new Set(),_ca:new Set()});
       const po=poMap.get(pk);
+      splitBreak(r[C.venAct]).forEach(a=>{if(!po._va.has(a)){po._va.add(a);po.venAct.push(a);}});
+      splitBreak(r[C.cliAct]).forEach(a=>{if(!po._ca.has(a)){po._ca.add(a);po.cliAct.push(a);}});
       const fk=clean(r[C.flDesc])||clean(r[C.flName]);
       if(!po.floorMap.has(fk))po.floorMap.set(fk,{label:fk,exp:r[C.flExp],act:r[C.flAct],status:clean(r[C.flStatus]),
         pend:fmtDate(r[C.flPend]),fend:fmtDate(r[C.flFend]),tot:uint(r[C.flTot]),uexp:uint(r[C.flUexp]),udel:uint(r[C.flUdel]),
@@ -167,7 +165,7 @@ function parseDump(aoa){
       splitBreak(r[C.iss]).forEach(x=>{if(!fl._si.has(x)){fl._si.add(x);fl.iss.push(x);}});
     }
     const pos=[...poMap.values()].map(p=>({...p,floors:[...p.floorMap.values()]}));
-    vendors.push({display:disp,projects,pos,actByProject});
+    vendors.push({display:disp,projects,pos});
   }
   vendors.sort((a,b)=>a.display.localeCompare(b.display));
   return vendors;
@@ -176,8 +174,8 @@ function parseDump(aoa){
 async function buildWorkbook(EX,vendor,selectedProjects){
   selectedProjects=(selectedProjects&&selectedProjects.length)?selectedProjects:vendor.projects.slice();
   const pos=vendor.pos.filter(p=>selectedProjects.includes(p.project));
-  const venAct=[],cliAct=[],_va=new Set(),_ca=new Set();
-  for(const pr of selectedProjects){const a=vendor.actByProject[pr];if(a){a.ven.forEach(x=>{if(!_va.has(x)){_va.add(x);venAct.push(x);}});a.cli.forEach(x=>{if(!_ca.has(x)){_ca.add(x);cliAct.push(x);}});}}
+  const venRows=[],cliRows=[];
+  for(const po of pos){po.venAct.forEach(t=>venRows.push({po:po.po,text:t}));po.cliAct.forEach(t=>cliRows.push({po:po.po,text:t}));}
   const wb=new EX.Workbook();
   const ws=wb.addWorksheet("Vendor Report",{views:[{showGridLines:false}],
     pageSetup:{orientation:"landscape",fitToPage:true,fitToWidth:1,fitToHeight:0,horizontalCentered:true,
@@ -213,20 +211,21 @@ async function buildWorkbook(EX,vendor,selectedProjects){
   r++;
 
   mrg(r,1,NC);put(r,1,"   OPEN ACTIONABLES",{b:true,col:WHITE,sz:11,bg:PKG});setH(r,22);r++;
-  function actTable(title,items){
-    mrg(r,1,6);put(r,1,"   "+title,{b:true,sz:10,bg:LAV});
+  function actTable(title,rows){
+    put(r,1,"PO No.",{b:true,sz:9,bg:LAV,al:"center"});
+    mrg(r,2,6);put(r,2,title,{b:true,sz:10,bg:LAV});
     mrg(r,7,9);put(r,7,"Comments (if any)",{b:true,sz:10,bg:LAV});rowBord(r);setH(r,20);r++;
-    if(!items.length){mrg(r,1,6);put(r,1,"   No open actionables",{sz:9,col:MUT});mrg(r,7,9);put(r,7,"",{bg:CREAM});rowBord(r);setH(r,20);r++;return;}
-    for(const x of items){mrg(r,1,6);put(r,1,"   "+x,{sz:9,wrap:true});mrg(r,7,9);put(r,7,"",{bg:CREAM});rowBord(r);setH(r,Math.max(20,(Math.floor(x.length/75)+1)*16+4));r++;}
+    if(!rows.length){put(r,1,"",{});mrg(r,2,6);put(r,2,"   No open actionables",{sz:9,col:MUT});mrg(r,7,9);put(r,7,"",{bg:CREAM});rowBord(r);setH(r,20);r++;return;}
+    for(const x of rows){put(r,1,x.po,{sz:9,al:"center"});mrg(r,2,6);put(r,2,"   "+x.text,{sz:9,wrap:true});mrg(r,7,9);put(r,7,"",{bg:CREAM});rowBord(r);setH(r,Math.max(20,(Math.floor(x.text.length/68)+1)*16+4));r++;}
   }
-  actTable("Vendor — Open Actionables",venAct);r++;
-  actTable("Client (CtrlS) — Open Actionables",cliAct);r+=3;
+  actTable("Vendor — Open Actionables",venRows);r++;
+  actTable("Client (CtrlS) — Open Actionables",cliRows);r+=3;
 
   const GRID=["Floor","Units\nDelivered / Total","Exp %","Act %","Status","Planned\nEnd","Forecast\nEnd"];
   for(const po of pos){
     mrg(r,1,7);put(r,1,`   ${po.project}      ·      ${po.pkg}      ·      PO ${po.po}      ·      ${po.desc}`,{b:true,col:WHITE,sz:12,bg:PKG});
     mrg(r,8,9);put(r,8,`Status: ${po.status}   `,{col:WHITE,sz:11,al:"right",bg:PKG});setH(r,26);r++;
-    mrg(r,1,NC);put(r,1,`   Expected ${pct(po.exp)}      ·      Actual ${pct(po.act)}            Planned End ${po.pend}      ·      Forecast End ${po.fend}            Units delivered ${po.udel} of ${po.tot}  ·  expected ${po.uexp} by now`,{sz:10,bg:ROLL});setH(r,24);r++;
+    mrg(r,1,NC);put(r,1,`   Expected ${pct(po.exp)}      ·      Actual ${pct(po.act)}            Planned End ${po.pend}            Units delivered ${po.udel} of ${po.tot}  ·  expected ${po.uexp} by now`,{sz:10,bg:ROLL});setH(r,24);r++;
     GRID.forEach((h,i)=>put(r,i+1,h,{b:true,sz:9,bg:PKG,col:WHITE,al:"center",wrap:true}));
     mrg(r,8,9);put(r,8,"Phase progress (last 24h)",{b:true,sz:9,bg:PKG,col:WHITE,al:"left",wrap:true});
     setH(r,32);r++;
@@ -244,8 +243,9 @@ async function buildWorkbook(EX,vendor,selectedProjects){
       put(r,5,{richText:[{font:{name:FN,size:10,bold:true,color:{argb:stcol(fl.status)}},text:"● "},
                          {font:{name:FN,size:10,color:{argb:BLACK}},text:fl.status}]},{al:"center"});
       put(r,6,fl.pend,{sz:10,al:"center"});
-      const slip=fl.fend&&fl.pend&&fl.fend!==fl.pend;
-      put(r,7,fl.fend,{sz:10,al:"center",col:slip?RED:BLACK,b:!!slip});
+      const actv=Number(fl.act);
+      if(isFinite(actv)&&actv<=0){put(r,7,"—",{sz:10,al:"center",col:RED,b:true});}
+      else{const slip=fl.fend&&fl.pend&&fl.fend!==fl.pend;put(r,7,fl.fend,{sz:10,al:"center",col:slip?RED:BLACK,b:!!slip});}
       mrg(r,8,9);
       const pl=phaseCell(r,8,fl.phases);
       rowBord(r);setH(r,Math.max(38,pl*26+12));r++;
